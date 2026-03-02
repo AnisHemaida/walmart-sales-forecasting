@@ -7517,11 +7517,11 @@ a.anchor-link {
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <center>
-<img alt="No description has been provided for this image" src="Page de garde.png" width="1000"/>
+<img alt="No description has been provided for this image" src="../images/Page de garde.png" width="1000"/>
 </center>
 <br/>
-<div style="text-align:left;">
-<strong>Membres de l’équipe :</strong>
+<div style="text-align:left">
+<strong>Membres de l'équipe :</strong>
 <ul style="margin-left:5px;">
 <li>Wassila Ennouar</li>
 <li>Salsabil Reguragui</li>
@@ -7715,6 +7715,7 @@ Intelligence décisionnelle &amp; exploitation
 </li>
 </ul>
 <p><br/><br/></p>
+<hr style="border: 1px solid #E67E22;"/>
 </div>
 </div>
 </div>
@@ -7725,6 +7726,48 @@ Intelligence décisionnelle &amp; exploitation
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<br/>
+<h2 id="Introduction"><span style="color:#2E86C1;">Introduction</span><a class="anchor-link" href="#Introduction">¶</a></h2><p>La <strong>grande distribution</strong> est un secteur hautement concurrentiel où la capacité à <strong>anticiper la demande</strong> constitue un avantage stratégique majeur. Walmart, en tant que leader mondial du commerce de détail, génère chaque semaine des volumes considérables de données transactionnelles à travers ses magasins répartis sur différentes régions.</p>
+<p>Ce projet, intitulé <strong>« Système Intelligent de Prévision des Ventes en Grande Distribution »</strong>, vise à concevoir et déployer un pipeline complet de science des données pour <strong>prédire les ventes hebdomadaires</strong> de Walmart. En exploitant des données historiques enrichies de variables contextuelles — telles que la température, le prix du carburant, le taux de chômage, l'indice des prix à la consommation (CPI) et les périodes promotionnelles (<em>markdown</em>) — nous chercherons à construire des modèles prédictifs robustes et interprétables.</p>
+<h3 id="Objectifs-principaux">Objectifs principaux<a class="anchor-link" href="#Objectifs-principaux">¶</a></h3><ul>
+<li><strong>Comprendre</strong> le contexte métier de la grande distribution et les facteurs qui influencent les ventes.</li>
+<li><strong>Explorer et préparer</strong> les données en identifiant les anomalies, les valeurs manquantes et les relations entre variables.</li>
+<li><strong>Modéliser</strong> les ventes à l'aide d'algorithmes de Machine Learning (régression, arbres de décision, forêts aléatoires, gradient boosting, etc.).</li>
+<li><strong>Évaluer</strong> la performance des modèles à travers des métriques adaptées (MAE, RMSE, WMAE).</li>
+<li><strong>Exploiter</strong> les résultats pour formuler des recommandations stratégiques à destination des décideurs.</li>
+</ul>
+<h3 id="Jeux-de-donn%C3%A9es-utilis%C3%A9s">Jeux de données utilisés<a class="anchor-link" href="#Jeux-de-donn%C3%A9es-utilis%C3%A9s">¶</a></h3><table>
+<thead>
+<tr>
+<th>Fichier</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train.csv</code></td>
+<td>Données d'entraînement : ventes hebdomadaires par magasin et département (2010-02 à 2012-10)</td>
+</tr>
+<tr>
+<td><code>test.csv</code></td>
+<td>Données de test pour la prédiction (2012-11 à 2013-07)</td>
+</tr>
+<tr>
+<td><code>stores.csv</code></td>
+<td>Informations sur les magasins (type et superficie)</td>
+</tr>
+<tr>
+<td><code>features.csv</code></td>
+<td>Variables contextuelles (température, carburant, CPI, chômage, promotions)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="D%C3%A9marche-adopt%C3%A9e">Démarche adoptée<a class="anchor-link" href="#D%C3%A9marche-adopt%C3%A9e">¶</a></h3><p>Le projet est structuré en <strong>trois grandes parties</strong> :</p>
+<ol>
+<li><strong>Compréhension et Préparation des Données</strong> — Exploration, nettoyage et ingénierie des variables.</li>
+<li><strong>Modélisation et Évaluation Prédictive</strong> — Entraînement, optimisation et comparaison des modèles.</li>
+<li><strong>Intelligence Décisionnelle et Exploitation</strong> — Interprétation des résultats et recommandations stratégiques.</li>
+</ol>
 </div>
 </div>
 </div>
@@ -10355,7 +10398,7 @@ Intelligence décisionnelle &amp; exploitation
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=6ac6c323">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=4ff601a1">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -10370,7 +10413,7 @@ Intelligence décisionnelle &amp; exploitation
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bf6a2faf">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0d5aefdc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>

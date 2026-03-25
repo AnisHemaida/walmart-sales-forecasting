@@ -47,7 +47,7 @@ def load_data():
 df_train, stores_info = load_data()
 
 # ─────────────────── SIDEBAR ───────────────────
-IMG_PATH = Path(__file__).resolve().parent / "images" / "Page de garde.png"
+IMG_PATH = Path(__file__).resolve().parent / "images" / "Walmart_logo_(2008,_stacked).svg"
 st.sidebar.image(str(IMG_PATH), width=180)
 st.sidebar.markdown("## 🛒 Navigation")
 
@@ -91,16 +91,10 @@ if page == pages[0]:
     c2.metric("Départements", f'{df["Dept"].nunique()}')
     c3.metric("Observations", f'{len(df):,}')
     
+    c4, c5= st.columns(2)
+    c4.metric("CA total", f'{df["Weekly_Sales"].sum()/1e9:,.2f} Md$')
+    c5.metric("Période", f'{df["Date"].min().strftime("%Y-%m")} → {df["Date"].max().strftime("%Y-%m")}')
 
-    c4, c5, c6, c7 = st.columns(4)
-    c4.metric("Ventes moy./sem.", f'{df["Weekly_Sales"].mean():,.0f} $')
-    c5.metric("Ventes médianes", f'{df["Weekly_Sales"].median():,.0f} $')
-    c6.metric("CA total", f'{df["Weekly_Sales"].sum()/1e9:,.2f} Md$')
-    c7.metric("% ventes négatives", f'{(df["Weekly_Sales"] < 0).mean()*100:.2f} %')
-
-    c8,= st.columns(1)
-    c8.metric("Période", f'{df["Date"].min().strftime("%Y-%m")} → {df["Date"].max().strftime("%Y-%m")}')
-    
 
     st.markdown("---")
     col_a, col_b = st.columns(2)
@@ -108,12 +102,13 @@ if page == pages[0]:
     with col_a:
         st.subheader("Répartition par type de magasin")
         type_stats = (df.groupby("Type")["Weekly_Sales"]
-                      .agg(["count", "mean", "median", "sum"])
-                      .rename(columns={"count": "Nb obs", "mean": "Moy ($)", "median": "Méd ($)", "sum": "CA total ($)"})
-                      .reset_index())
+                  .agg(["count", "mean", "median", "sum"])
+                  .rename(columns={"count": "Nb obs", "mean": "Moy ($)", "median": "Méd ($)", "sum": "CA total ($)"})
+                  .reset_index())
         fig_type = px.pie(type_stats, values="CA total ($)", names="Type",
-                          color="Type", color_discrete_map=COLOR_TYPE,
-                          title="Part du CA total par type")
+                  color="Type", color_discrete_map=COLOR_TYPE,
+                  title="Part du CA total par type",
+                  hole=0.5)
         st.plotly_chart(fig_type, use_container_width=True)
 
     with col_b:
@@ -124,16 +119,40 @@ if page == pages[0]:
         fig_dist.update_layout(xaxis_title="Weekly_Sales ($)", yaxis_title="Fréquence")
         st.plotly_chart(fig_dist, use_container_width=True)
 
-    st.subheader("Top 10 magasins par CA total")
-    top10 = (df.groupby("Store")["Weekly_Sales"].sum()
-             .nlargest(10).reset_index()
-             .rename(columns={"Weekly_Sales": "CA total ($)"}))
-    top10 = top10.merge(stores_info, on="Store")
-    fig_top = px.bar(top10, x="Store", y="CA total ($)", color="Type",
-                     color_discrete_map=COLOR_TYPE, text_auto=".2s",
-                     title="Top 10 magasins par chiffre d'affaires total")
-    fig_top.update_layout(xaxis=dict(dtick=1))
-    st.plotly_chart(fig_top, use_container_width=True)
+    # ── Graphique : Top 20 départements par CA ───────────────────────────
+    st.subheader("Top 20 départements par CA total")
+    dept_stats = (
+        df_train
+        .groupby('Dept')['Weekly_Sales']
+        .agg(Total='sum', Moyenne='mean', Mediane='median', Ecart_type='std')
+        .reset_index()
+    )
+    # Ajout du nombre de magasins par département
+    dept_store_count = df_train.groupby('Dept')['Store'].nunique().reset_index(name='Nb_magasins')
+    dept_stats = dept_stats.merge(dept_store_count, on='Dept')
+    # Calcul de la part du CA (%)
+    dept_stats['Part_CA (%)'] = (dept_stats['Total'] / dept_stats['Total'].sum() * 100).round(2)
+    dept_stats = dept_stats.sort_values('Total', ascending=False)
+    dept_stats['Cumul_CA (%)'] = dept_stats['Part_CA (%)'].cumsum().round(2)
+    top20_dept = dept_stats.head(20).sort_values('Total', ascending=True)
+    fig4 = px.bar(
+        top20_dept,
+        y='Dept', x='Total',
+        orientation='h',
+        title='Top 20 départements par ventes totales – Dataset TRAIN',
+        labels={'Total': 'Ventes totales ($)', 'Dept': 'Département'},
+        text=top20_dept['Total'].apply(lambda x: f'{x/1e6:.1f}M$'),
+        color='Part_CA (%)',
+        color_continuous_scale='Blues'
+    )
+    fig4.update_traces(textposition='outside', textfont_size=9)
+    fig4.update_layout(
+        height=600, width=900,
+        template='plotly_white',
+        yaxis=dict(type='category', dtick=1),
+        margin=dict(l=60, r=100)
+    )
+    st.plotly_chart(fig4, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -315,6 +334,70 @@ elif page == pages[3]:
 elif page == pages[4]:
     st.title("🎄 Effet des jours fériés sur les ventes")
 
+    # ── Agrégation hebdomadaire totale et graphique d'évolution ──
+    weekly_total = (
+        df_train.groupby('Date', observed=True)
+        .agg(Total_Sales=('Weekly_Sales', 'sum'),
+             Moyenne=('Weekly_Sales', 'mean'),
+             Nb_obs=('Weekly_Sales', 'count'),
+             Holiday=('IsHoliday', 'first'))
+        .reset_index()
+        .sort_values('Date')
+    )
+    weekly_total['MA_4w'] = weekly_total['Total_Sales'].rolling(window=4, center=True).mean()
+
+    st.markdown(f"""
+    **Période couverte :** {weekly_total['Date'].min().strftime('%d/%m/%Y')} → {weekly_total['Date'].max().strftime('%d/%m/%Y')}  
+    **Nombre de semaines :** {len(weekly_total)}  
+    - Semaines fériées : {int(weekly_total['Holiday'].sum())}  
+    - Semaines normales : {int((~weekly_total['Holiday']).sum())}
+    """)
+    st.markdown(f"""
+    **Ventes hebdomadaires totales (tous magasins) :**  
+    - Minimum : {weekly_total['Total_Sales'].min():,.0f} $  ({weekly_total.loc[weekly_total['Total_Sales'].idxmin(), 'Date'].strftime('%d/%m/%Y')})  
+    - Maximum : {weekly_total['Total_Sales'].max():,.0f} $  ({weekly_total.loc[weekly_total['Total_Sales'].idxmax(), 'Date'].strftime('%d/%m/%Y')})  
+    - Moyenne : {weekly_total['Total_Sales'].mean():,.0f} $
+    """)
+
+    fig_ts = go.Figure()
+    # Bandes verticales pour les fêtes
+    for _, r in weekly_total[weekly_total['Holiday']].iterrows():
+        fig_ts.add_vrect(
+            x0=r['Date'] - pd.Timedelta(days=3),
+            x1=r['Date'] + pd.Timedelta(days=3),
+            fillcolor='rgba(255, 200, 50, 0.15)',
+            line_width=0, layer='below'
+        )
+    # Série principale
+    fig_ts.add_trace(go.Scatter(
+        x=weekly_total['Date'], y=weekly_total['Total_Sales'],
+        mode='lines', name='Ventes hebdo totales',
+        line=dict(color='#2E86C1', width=1.5),
+        hovertemplate='%{x|%d/%m/%Y}<br>Ventes: %{y:,.0f} $<extra></extra>'
+    ))
+    # Moyenne mobile
+    fig_ts.add_trace(go.Scatter(
+        x=weekly_total['Date'], y=weekly_total['MA_4w'],
+        mode='lines', name='Moyenne mobile 4 sem.',
+        line=dict(color='#E74C3C', width=2.5, dash='dot')
+    ))
+    # Marqueurs fêtes
+    holidays_ts = weekly_total[weekly_total['Holiday']]
+    fig_ts.add_trace(go.Scatter(
+        x=holidays_ts['Date'], y=holidays_ts['Total_Sales'],
+        mode='markers', name='Semaines fériées',
+        marker=dict(color='#F39C12', size=9, symbol='star', line=dict(width=1, color='#333'))
+    ))
+    fig_ts.update_layout(
+        title='Évolution des ventes hebdomadaires totales – Tous magasins confondus',
+        xaxis_title='Date', yaxis_title='Ventes totales ($)',
+        height=500, width=1000,
+        template='plotly_white',
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        hovermode='x unified'
+    )
+    st.plotly_chart(fig_ts, use_container_width=True)
+
     hol = df[df["IsHoliday"] == True]
     norm = df[df["IsHoliday"] == False]
     moy_hol = hol["Weekly_Sales"].mean()
@@ -397,6 +480,7 @@ elif page == pages[5]:
     st.markdown("---")
     tab1, tab2, tab3, tab4 = st.tabs(["🌡 Température", "⛽ Fuel Price", "📊 CPI", "📉 Chômage"])
 
+
     with tab1:
         df_temp = df.copy()
         df_temp["Temp_Bin"] = pd.cut(df_temp["Temperature"], bins=8)
@@ -426,35 +510,53 @@ elif page == pages[5]:
                           color_discrete_sequence=[COLOR_ACC])
         st.plotly_chart(fig_fuel, use_container_width=True)
 
+        fuel_type = df.groupby(["Month", "Type"]).agg(
+            Moy_Fuel=("Fuel_Price", "mean"),
+            Moy_Ventes=("Weekly_Sales", "mean")).reset_index()
+        fig_ft = px.scatter(fuel_type, x="Moy_Fuel", y="Moy_Ventes",
+                            color="Type", color_discrete_map=COLOR_TYPE,
+                            title="Prix carburant vs Ventes par mois et type",
+                            trendline="ols")
+        st.plotly_chart(fig_ft, use_container_width=True)
+
     with tab3:
-        store_eco = df.groupby(["Store", "Type"]).agg(
-            CPI_Moy=("CPI", "mean"), Ventes_Moy=("Weekly_Sales", "mean")).reset_index()
-        fig_cpi = px.scatter(store_eco, x="CPI_Moy", y="Ventes_Moy",
-                             color="Type", color_discrete_map=COLOR_TYPE,
-                             size="Ventes_Moy", size_max=18,
-                             title="CPI moyen vs Ventes moyennes par magasin",
-                             trendline="ols")
+        df_cpi = df.copy()
+        df_cpi["CPI_Bin"] = pd.cut(df_cpi["CPI"], bins=8)
+        cpi_sales = df_cpi.groupby("CPI_Bin", observed=True)["Weekly_Sales"].mean().reset_index()
+        cpi_sales["CPI_Bin"] = cpi_sales["CPI_Bin"].astype(str)
+        fig_cpi_bar = px.bar(cpi_sales, x="CPI_Bin", y="Weekly_Sales",
+                             title="Ventes moyennes par tranche de CPI",
+                             color_discrete_sequence=[COLOR_MAIN])
+        st.plotly_chart(fig_cpi_bar, use_container_width=True)
+
+        cpi_type = df.groupby(["Month", "Type"]).agg(
+            Moy_CPI=("CPI", "mean"),
+            Moy_Ventes=("Weekly_Sales", "mean")).reset_index()
+        fig_cpi = px.scatter(cpi_type, x="Moy_CPI", y="Moy_Ventes",
+                            color="Type", color_discrete_map=COLOR_TYPE,
+                            title="CPI vs Ventes par mois et type",
+                            trendline="ols")
         st.plotly_chart(fig_cpi, use_container_width=True)
 
     with tab4:
-        store_unemp = df.groupby(["Store", "Type"]).agg(
-            Unemp_Moy=("Unemployment", "mean"), Ventes_Moy=("Weekly_Sales", "mean")).reset_index()
-        fig_unemp = px.scatter(store_unemp, x="Unemp_Moy", y="Ventes_Moy",
-                               color="Type", color_discrete_map=COLOR_TYPE,
-                               size="Ventes_Moy", size_max=18,
-                               title="Chômage moyen vs Ventes moyennes par magasin",
-                               trendline="ols")
+        df_unemp = df.copy()
+        df_unemp["Unemp_Bin"] = pd.cut(df_unemp["Unemployment"], bins=8)
+        unemp_sales = df_unemp.groupby("Unemp_Bin", observed=True)["Weekly_Sales"].mean().reset_index()
+        unemp_sales["Unemp_Bin"] = unemp_sales["Unemp_Bin"].astype(str)
+        fig_unemp_bar = px.bar(unemp_sales, x="Unemp_Bin", y="Weekly_Sales",
+                               title="Ventes moyennes par tranche de chômage",
+                               color_discrete_sequence=[COLOR_ACC])
+        st.plotly_chart(fig_unemp_bar, use_container_width=True)
+
+        unemp_type = df.groupby(["Month", "Type"]).agg(
+            Moy_Unemp=("Unemployment", "mean"),
+            Moy_Ventes=("Weekly_Sales", "mean")).reset_index()
+        fig_unemp = px.scatter(unemp_type, x="Moy_Unemp", y="Moy_Ventes",
+                              color="Type", color_discrete_map=COLOR_TYPE,
+                              title="Chômage vs Ventes par mois et type",
+                              trendline="ols")
         st.plotly_chart(fig_unemp, use_container_width=True)
 
-    st.subheader("Corrélations globales avec Weekly_Sales")
-    corr_eco = df[eco_cols + ["Weekly_Sales"]].corr()["Weekly_Sales"].drop("Weekly_Sales").sort_values(key=abs, ascending=True)
-    fig_eco_bar = px.bar(x=corr_eco.values, y=corr_eco.index, orientation="h",
-                         title="Corrélation Pearson : variables économiques ↔ ventes",
-                         color=corr_eco.values,
-                         color_continuous_scale="RdBu_r",
-                         range_color=[-0.2, 0.2])
-    fig_eco_bar.update_layout(xaxis_title="Pearson r", yaxis_title="", height=300)
-    st.plotly_chart(fig_eco_bar, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -469,65 +571,36 @@ elif page == pages[6]:
     # Pearson global
     pearson = df[num_cols + ["Weekly_Sales"]].corr()["Weekly_Sales"].drop("Weekly_Sales").sort_values(key=abs, ascending=False)
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("Classement Pearson")
-        colors_p = ["#e74c3c" if v < 0 else "#2ecc71" for v in pearson.values]
-        fig_rank = go.Figure(go.Bar(
-            x=pearson.values, y=pearson.index, orientation="h",
-            marker_color=colors_p,
-            text=[f"{v:+.4f}" for v in pearson.values],
-            textposition="outside"
-        ))
-        fig_rank.update_layout(yaxis=dict(autorange="reversed"),
-                               height=max(400, len(pearson)*28),
-                               margin=dict(l=140))
-        st.plotly_chart(fig_rank, use_container_width=True)
-
-    with col_b:
-        st.subheader("Matrice de corrélation")
-        key_vars = ["Weekly_Sales", "Size", "Temperature", "Fuel_Price",
-                     "CPI", "Unemployment", "IsHoliday"]
-        for md in ["MarkDown1", "MarkDown2", "MarkDown3", "MarkDown4", "MarkDown5", "Total_MarkDown"]:
-            if md in df.columns:
-                key_vars.append(md)
-        key_vars = [v for v in key_vars if v in df.columns]
-        corr_mat = df[key_vars].corr()
-        fig_hm = go.Figure(go.Heatmap(
-            z=corr_mat.values, x=key_vars, y=key_vars,
-            colorscale="RdBu_r", zmid=0,
-            text=[[f"{v:.2f}" for v in row] for row in corr_mat.values],
-            texttemplate="%{text}", textfont=dict(size=9)
-        ))
-        fig_hm.update_layout(height=550)
-        st.plotly_chart(fig_hm, use_container_width=True)
-
-    st.subheader("Pearson vs Spearman — Détection de non-linéarité")
-    comp = []
-    for col in num_cols:
-        valid = df[["Weekly_Sales", col]].dropna()
-        if len(valid) > 30:
-            pr = valid["Weekly_Sales"].corr(valid[col])
-            sr, _ = spearmanr(valid["Weekly_Sales"], valid[col])
-            comp.append({"Variable": col, "Pearson": pr, "Spearman": sr,
-                         "|Δ|": abs(sr - pr)})
-    comp_df_dash = pd.DataFrame(comp).sort_values("|Δ|", ascending=False)
-
-    fig_ps = go.Figure()
-    fig_ps.add_trace(go.Scatter(
-        x=comp_df_dash["Pearson"], y=comp_df_dash["Spearman"],
-        mode="markers+text", text=comp_df_dash["Variable"],
-        textposition="top center",
-        marker=dict(size=10, color=comp_df_dash["|Δ|"],
-                    colorscale="YlOrRd", showscale=True),
-        textfont=dict(size=9)
+    st.subheader("Classement Pearson")
+    colors_p = ["#e74c3c" if v < 0 else "#2ecc71" for v in pearson.values]
+    fig_rank = go.Figure(go.Bar(
+        x=pearson.values, y=pearson.index, orientation="h",
+        marker_color=colors_p,
+        text=[f"{v:+.4f}" for v in pearson.values],
+        textposition="outside"
     ))
-    fig_ps.add_shape(type="line", x0=-0.5, y0=-0.5, x1=0.5, y1=0.5,
-                     line=dict(dash="dash", color="gray"))
-    fig_ps.update_layout(
-        title="Pearson vs Spearman (écart à la diag. = non-linéarité)",
-        xaxis_title="Pearson r", yaxis_title="Spearman ρ", height=500)
-    st.plotly_chart(fig_ps, use_container_width=True)
+    fig_rank.update_layout(yaxis=dict(autorange="reversed"),
+                           height=max(400, len(pearson)*28),
+                           margin=dict(l=140))
+    st.plotly_chart(fig_rank, use_container_width=True)
+
+    st.subheader("Matrice de corrélation")
+    key_vars = ["Weekly_Sales", "Size", "Temperature", "Fuel_Price",
+                 "CPI", "Unemployment", "IsHoliday"]
+    for md in ["MarkDown1", "MarkDown2", "MarkDown3", "MarkDown4", "MarkDown5", "Total_MarkDown"]:
+        if md in df.columns:
+            key_vars.append(md)
+    key_vars = [v for v in key_vars if v in df.columns]
+    corr_mat = df[key_vars].corr()
+    fig_hm = go.Figure(go.Heatmap(
+        z=corr_mat.values, x=key_vars, y=key_vars,
+        colorscale="RdBu_r", zmid=0,
+        text=[[f"{v:.2f}" for v in row] for row in corr_mat.values],
+        texttemplate="%{text}", textfont=dict(size=9)
+    ))
+    fig_hm.update_layout(height=550)
+    st.plotly_chart(fig_hm, use_container_width=True)
+
 
 # ─────────────────── FOOTER ───────────────────
 st.sidebar.markdown("---")

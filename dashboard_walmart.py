@@ -55,11 +55,12 @@ pages = [
     "📊 Vue d'ensemble",
     "📈 Tendances temporelles",
     "🏪 Types de magasins",
+    "📦 Analyse par département",
     "🏷️ Impact des promotions",
     "🎄 Effet des jours fériés",
     "🌡️ Variables économiques",
     "🔗 Corrélations & Features",
-    #"✅ Recommandations"
+    "✅ Recommandations",
 ]
 page = st.sidebar.radio("Section", pages, label_visibility="collapsed")
 
@@ -69,7 +70,26 @@ st.sidebar.markdown("### Filtres")
 types_sel = st.sidebar.multiselect("Type de magasin", ["A", "B", "C"], default=["A", "B", "C"])
 years_sel = st.sidebar.multiselect("Année", sorted(df_train["Year"].unique()), default=sorted(df_train["Year"].unique()))
 
-df = df_train[(df_train["Type"].isin(types_sel)) & (df_train["Year"].isin(years_sel))]
+all_depts = sorted(df_train["Dept"].unique())
+depts_sel = st.sidebar.multiselect("Département", all_depts, default=all_depts,
+                                   help="Filtrer par numéro de département")
+
+df = df_train[
+    (df_train["Type"].isin(types_sel)) &
+    (df_train["Year"].isin(years_sel)) &
+    (df_train["Dept"].isin(depts_sel))
+]
+
+# Bouton de téléchargement
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Exporter les données")
+csv_export = df.to_csv(index=False).encode("utf-8")
+st.sidebar.download_button(
+    label="📥 Télécharger (CSV)",
+    data=csv_export,
+    file_name="walmart_filtered.csv",
+    mime="text/csv",
+)
 
 # ─────────────────── COULEURS ───────────────────
 COLOR_TYPE  = {"A": "#3498db", "B": "#2ecc71", "C": "#e74c3c"}
@@ -257,9 +277,91 @@ elif page == pages[2]:
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  PAGE 4 — IMPACT DES PROMOTIONS
+#  PAGE 4 — ANALYSE PAR DÉPARTEMENT
 # ═══════════════════════════════════════════════════════════════════
 elif page == pages[3]:
+    st.title("📦 Analyse par département")
+    st.markdown("Exploration des performances des départements de vente")
+
+    # KPIs départements
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Départements actifs", f'{df["Dept"].nunique()}')
+    top_dept = df.groupby("Dept")["Weekly_Sales"].sum().idxmax()
+    c2.metric("Meilleur département", f'Dept {top_dept}')
+    dept_moy = df.groupby("Dept")["Weekly_Sales"].mean()
+    c3.metric("CA moyen / dept", f'{dept_moy.mean():,.0f} $')
+    c4.metric("Depts rentables (moy > 0)", f'{(dept_moy > 0).sum()}')
+
+    st.markdown("---")
+
+    # Top 15 et flop 10 départements
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("Top 15 départements par CA total")
+        top15_dept = (df.groupby("Dept")["Weekly_Sales"].sum()
+                      .nlargest(15).reset_index()
+                      .rename(columns={"Weekly_Sales": "CA total ($)"}))
+        fig_top_dept = px.bar(top15_dept, x="Dept", y="CA total ($)",
+                              text_auto=".2s",
+                              color_discrete_sequence=[COLOR_MAIN],
+                              title="Top 15 départements par chiffre d'affaires")
+        fig_top_dept.update_layout(xaxis=dict(dtick=1))
+        st.plotly_chart(fig_top_dept, use_container_width=True)
+
+    with col_b:
+        st.subheader("Flop 10 départements par CA total")
+        flop10_dept = (df.groupby("Dept")["Weekly_Sales"].sum()
+                       .nsmallest(10).reset_index()
+                       .rename(columns={"Weekly_Sales": "CA total ($)"}))
+        fig_flop_dept = px.bar(flop10_dept, x="Dept", y="CA total ($)",
+                               text_auto=".2s",
+                               color_discrete_sequence=[COLOR_NEG],
+                               title="Flop 10 départements (CA le plus faible)")
+        fig_flop_dept.update_layout(xaxis=dict(dtick=1))
+        st.plotly_chart(fig_flop_dept, use_container_width=True)
+
+    # Saisonnalité par département (top 5)
+    st.subheader("Saisonnalité mensuelle — Top 5 départements")
+    top5_dept = (df.groupby("Dept")["Weekly_Sales"].sum()
+                 .nlargest(5).index.tolist())
+    dept_month = (df[df["Dept"].isin(top5_dept)]
+                  .groupby(["Dept", "Month"])["Weekly_Sales"].mean().reset_index())
+    month_labels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun",
+                    "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+    dept_month["Mois"] = dept_month["Month"].map(lambda m: month_labels[m - 1])
+    fig_dept_season = px.line(dept_month, x="Mois", y="Weekly_Sales",
+                              color="Dept", color_discrete_sequence=px.colors.qualitative.Set2,
+                              title="Profil saisonnier des 5 meilleurs départements")
+    fig_dept_season.update_layout(xaxis=dict(categoryorder="array",
+                                             categoryarray=month_labels))
+    st.plotly_chart(fig_dept_season, use_container_width=True)
+
+    # Impact promotions par département
+    st.subheader("Impact des promotions par département (Top 15)")
+    dept_promo = []
+    for d in df["Dept"].unique():
+        sub = df[df["Dept"] == d]
+        avec = sub[sub["HasPromo"] == 1]["Weekly_Sales"].mean()
+        sans = sub[sub["HasPromo"] == 0]["Weekly_Sales"].mean()
+        if pd.notna(avec) and pd.notna(sans) and sans > 0:
+            dept_promo.append({"Dept": d, "Lift (%)": (avec - sans) / sans * 100})
+    if dept_promo:
+        dept_promo_df = (pd.DataFrame(dept_promo)
+                         .sort_values("Lift (%)", ascending=False)
+                         .head(15))
+        fig_dept_promo = px.bar(dept_promo_df, x="Dept", y="Lift (%)",
+                                color="Lift (%)",
+                                color_continuous_scale="RdYlGn",
+                                text_auto="+.1f",
+                                title="Lift promotion (%) — Top 15 départements")
+        fig_dept_promo.update_layout(xaxis=dict(dtick=1))
+        st.plotly_chart(fig_dept_promo, use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  PAGE 5 — IMPACT DES PROMOTIONS
+# ═══════════════════════════════════════════════════════════════════
+elif page == pages[4]:
     st.title("🏷️ Impact des promotions (MarkDowns)")
 
     md_cols = [c for c in df.columns if c.startswith("MarkDown")]
@@ -331,7 +433,7 @@ elif page == pages[3]:
 # ═══════════════════════════════════════════════════════════════════
 #  PAGE 5 — EFFET DES JOURS FÉRIÉS
 # ═══════════════════════════════════════════════════════════════════
-elif page == pages[4]:
+elif page == pages[5]:
     st.title("🎄 Effet des jours fériés sur les ventes")
 
     # ── Agrégation hebdomadaire totale et graphique d'évolution ──
@@ -463,7 +565,7 @@ elif page == pages[4]:
 # ═══════════════════════════════════════════════════════════════════
 #  PAGE 6 — VARIABLES ÉCONOMIQUES
 # ═══════════════════════════════════════════════════════════════════
-elif page == pages[5]:
+elif page == pages[6]:
     st.title("🌡️ Variables économiques et saisonnières")
 
     eco_cols = ["Temperature", "Fuel_Price", "CPI", "Unemployment"]
@@ -562,7 +664,7 @@ elif page == pages[5]:
 # ═══════════════════════════════════════════════════════════════════
 #  PAGE 7 — CORRÉLATIONS & FEATURES
 # ═══════════════════════════════════════════════════════════════════
-elif page == pages[6]:
+elif page == pages[7]:
     st.title("🔗 Corrélations entre variables et ventes")
 
     num_cols = [c for c in df.select_dtypes(include="number").columns
@@ -601,6 +703,99 @@ elif page == pages[6]:
     fig_hm.update_layout(height=550)
     st.plotly_chart(fig_hm, use_container_width=True)
 
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  PAGE 9 — RECOMMANDATIONS
+# ═══════════════════════════════════════════════════════════════════
+elif page == pages[8]:
+    st.title("✅ Recommandations stratégiques")
+    st.markdown("Synthèse des enseignements de l'analyse et leviers d'action pour Walmart")
+
+    st.markdown("---")
+
+    # Calcul de métriques pour contextualiser les recommandations
+    top3_stores = (df.groupby(["Store", "Type"])["Weekly_Sales"].sum()
+                   .nlargest(3).reset_index())
+    top3_depts = (df.groupby("Dept")["Weekly_Sales"].sum()
+                  .nlargest(3).index.tolist())
+    moy_avec = df[df["HasPromo"] == 1]["Weekly_Sales"].mean()
+    moy_sans = df[df["HasPromo"] == 0]["Weekly_Sales"].mean()
+    lift_promo = (moy_avec - moy_sans) / moy_sans * 100 if moy_sans > 0 else 0
+    hol = df[df["IsHoliday"] == True]
+    norm = df[df["IsHoliday"] == False]
+    lift_hol = (hol["Weekly_Sales"].mean() - norm["Weekly_Sales"].mean()) / norm["Weekly_Sales"].mean() * 100 if len(norm) > 0 else 0
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🏪 Gestion des magasins")
+        st.info(
+            f"**Concentrer les investissements sur les magasins de type A.**\n\n"
+            f"Les magasins A représentent la part la plus élevée du CA total. "
+            f"Le top 3 des magasins (stores {', '.join(str(s) for s in top3_stores['Store'].tolist())}) "
+            f"génèrent une part disproportionnée des revenus. "
+            f"Il est recommandé de prioriser leurs réapprovisionnements et d'y concentrer les promotions."
+        )
+
+        st.subheader("📦 Gestion des départements")
+        st.success(
+            f"**Optimiser les stocks pour les départements clés.**\n\n"
+            f"Les départements {', '.join(str(d) for d in top3_depts)} sont les plus performants. "
+            f"Assurer leur disponibilité en stock, notamment en période de fêtes, "
+            f"permettrait d'éviter les ruptures et de maximiser le CA."
+        )
+
+    with col2:
+        st.subheader("🏷️ Stratégie promotionnelle")
+        if lift_promo > 0:
+            st.success(
+                f"**Renforcer les campagnes de MarkDown.**\n\n"
+                f"Les semaines avec promotion affichent un lift moyen de **{lift_promo:+.1f}%** "
+                f"par rapport aux semaines sans promotion. "
+                f"Il est conseillé d'amplifier les MarkDown 1 et 2 qui présentent le plus fort impact, "
+                f"et de les synchroniser avec les périodes creuses pour lisser la demande."
+            )
+        else:
+            st.warning(
+                f"**Revoir la stratégie de MarkDown.**\n\n"
+                f"Les promotions n'affichent pas de lift positif ({lift_promo:+.1f}%) sur la sélection actuelle. "
+                f"Analyser les départements et magasins concernés pour cibler les promotions plus efficacement."
+            )
+
+        st.subheader("🎄 Planification des fêtes")
+        st.info(
+            f"**Anticiper les pics de Thanksgiving et Noël.**\n\n"
+            f"Les jours fériés génèrent un lift moyen de **{lift_hol:+.1f}%** sur les ventes. "
+            f"Thanksgiving est la fête la plus impactante. Il est recommandé d'augmenter les stocks "
+            f"4 à 6 semaines avant ces périodes et de renforcer les effectifs en magasin."
+        )
+
+    st.markdown("---")
+    st.subheader("🌡️ Adaptation aux variables économiques")
+    st.markdown(
+        """
+        | Variable | Observation | Levier d'action |
+        |---|---|---|
+        | **Température** | Impact modéré sur les ventes | Adapter l'assortiment saisonnier (été/hiver) |
+        | **Prix du carburant** | Légère corrélation négative | Surveiller les hausses pour ajuster les prix en rayon |
+        | **CPI** | Corrélation variable selon le type de magasin | Positionner les produits d'entrée de gamme en période d'inflation |
+        | **Taux de chômage** | Corrélation négative | Cibler les promotions dans les régions à fort chômage |
+        """
+    )
+
+    st.markdown("---")
+    st.subheader("📈 Synthèse des priorités")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.markdown("**🥇 Priorité Haute**")
+        st.markdown("- Anticiper Thanksgiving & Noël\n\n- Renforcer les magasins Type A\n\n- Optimiser MarkDown 1 & 2")
+    with col_b:
+        st.markdown("**🥈 Priorité Moyenne**")
+        st.markdown(f"- Surveiller les Depts {', '.join(str(d) for d in top3_depts)}\n\n- Adapter aux cycles économiques\n\n- Lisser les promotions hors-saison")
+    with col_c:
+        st.markdown("**🥉 Priorité Basse**")
+        st.markdown("- Optimiser les magasins Type C\n\n- Réduire les ventes négatives\n\n- Analyser les MarkDown 3, 4 et 5")
 
 # ─────────────────── FOOTER ───────────────────
 st.sidebar.markdown("---")

@@ -87,8 +87,8 @@ Le système permet de :
 
 <div align="center">
 
-| 👤 Membre | 🎓 Rôle |
-|-----------|---------|
+| 👤 Membre |
+|-----------|
 | **Anis Hemaida** |
 | **Wassila Ennouar** |
 | **Salsabil Reguragui** | 

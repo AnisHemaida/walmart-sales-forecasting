@@ -71,7 +71,7 @@ Le système permet de :
 | Métrique | Valeur |
 |----------|--------|
 | 📊 R² Score | **98,55 %** |
-| 💵 WMAE | **1 264 $** |
+| 💵 WMAE | **1 332 $** |
 | 🏪 Magasins | **45** |
 | 🗂️ Départements | **81** |
 | 📅 Données | **421 570** lignes |

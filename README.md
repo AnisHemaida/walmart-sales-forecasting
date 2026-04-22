@@ -89,15 +89,15 @@ Le système permet de :
 
 | 👤 Membre | 🎓 Rôle |
 |-----------|---------|
-| **Anis Hemaida** | Data Scientist / Développeur Full-Stack |
-| **Wassila Ennouar** | Data Analyst / Modélisation ML |
-| **Salsabil Reguragui** | Feature Engineering / Analyse exploratoire |
-| **Mohamed Lamine Zoutat** | Visualisation / Dashboard |
-| **Farid Bandoui** | Prétraitement des données / Évaluation |
-| **Abdennour Kerrouch** | Gestion de stocks / Recommandations |
+| **Anis Hemaida** |
+| **Wassila Ennouar** |
+| **Salsabil Reguragui** | 
+| **Mohamed Lamine Zoutat** | 
+| **Farid Bandoui** | 
+| **Abdennour Kerrouch** | 
 
 > **Établissement :** La Cité — Collège d'arts appliqués et de technologie  
-> **Programme :** Sciences des données — Session 4 (H2026)
+> **Programme :** Sciences des données — Session 4
 
 </div>
 
